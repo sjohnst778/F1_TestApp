@@ -15,7 +15,7 @@ import plotly.express as px
 from plotly.io import show
 
 
-fastf1.Cache.enable_cache('f1cache')
+#fastf1.Cache.enable_cache('f1cache')
 
 
 def rotate(xy, *, angle):

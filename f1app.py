@@ -547,7 +547,8 @@ def driverComparison(year, selected_race, selected_session, selected_driver1, se
     styled = showSectorTimesComparison(session, selected_driver1, selected_driver2)
     st.pyplot(fig2)
     st.pyplot(fig1)
-    html = styled.render()
+    #html = styled.render()
+    html = styled.to_html()
     components.html(html, height=300, scrolling=True)
 
 def calculatewhocanwin(driver_standings, max_points):

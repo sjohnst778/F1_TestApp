@@ -1,19 +1,17 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import matplotlib.pyplot as plt
-import fastf1 as f1
-import fastf1.plotting
 import seaborn as sns
-
+import fastf1 as f1
+import fastf1.plotting as fpl
 from fastf1.core import Laps
 from fastf1.ergast import Ergast
 from timple.timedelta import strftimedelta
-
-import plotly.express as px
+from typing import List
 from plotly.io import show
-
 
 #fastf1.Cache.enable_cache('f1cache')
 
@@ -124,7 +122,7 @@ def drawtrackfor(session):
 def plotdriverslaptimes(session, driver):
     # Enable Matplotlib patches for plotting timedelta values and load
     # FastF1's dark color scheme
-    fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
+    fpl.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
     fig, ax = plt.subplots(figsize=(8, 8))
 
     for drv in driver:
@@ -146,7 +144,6 @@ def plotdriverslaptimes(session, driver):
     # The y-axis increases from bottom to top by default
     # Since we are plotting time, it makes sense to invert the axis
     ax.invert_yaxis()
-#    plt.suptitle("Alonso Laptimes in the 2023 Azerbaijan Grand Prix")
 
     # Turn on major grid lines
     plt.grid(color='w', which='major', axis='both')
@@ -158,7 +155,7 @@ def plotdriverslaptimes(session, driver):
 def plotsingledriverlaptimes(session, driver):
     # Enable Matplotlib patches for plotting timedelta values and load
     # FastF1's dark color scheme
-    fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
+    f1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
     fig, ax = plt.subplots(figsize=(8, 8))
 
     driver_laps = session.laps.pick_drivers(driver).pick_quicklaps().reset_index()
@@ -178,7 +175,6 @@ def plotsingledriverlaptimes(session, driver):
     # The y-axis increases from bottom to top by default
     # Since we are plotting time, it makes sense to invert the axis
     ax.invert_yaxis()
-#    plt.suptitle("Alonso Laptimes in the 2023 Azerbaijan Grand Prix")
 
     # Turn on major grid lines
     plt.grid(color='w', which='major', axis='both')
@@ -189,7 +185,6 @@ def plotsingledriverlaptimes(session, driver):
 
 def showraceresults(session):
     f1.plotting.setup_mpl(mpl_timedelta_support=False, color_scheme='fastf1')
-#    session.load(telemetry=False, weather=False)
     fig, ax = plt.subplots(figsize=(8.0, 4.9))
 
     for drv in session.drivers:
@@ -340,7 +335,7 @@ def get_event_driver_abbreviations(year, event, session_name='Race'):
     return abbs
 
 def driverlaptimes(session):
-    fastf1.plotting.setup_mpl(mpl_timedelta_support=False, color_scheme='fastf1')
+    fpl.setup_mpl(mpl_timedelta_support=False, color_scheme='fastf1')
     point_finishers = session.drivers[:10]
     driver_laps = session.laps.pick_drivers(point_finishers).pick_quicklaps()
     driver_laps = driver_laps.reset_index()
@@ -485,8 +480,8 @@ def getSpeedTraceFor(session, driver1, driver2):
     driver2_tel = driver2_lap.get_car_data().add_distance()
     circuit_info = session.get_circuit_info()
 
-    d1_color = fastf1.plotting.get_team_color(driver1_lap['Team'], session=session)
-    d2_color = fastf1.plotting.get_team_color(driver2_lap['Team'], session=session)
+    d1_color = fpl.get_team_color(driver1_lap['Team'], session=session)
+    d2_color = fpl.get_team_color(driver2_lap['Team'], session=session)
     d2_linestyle = '--' if d1_color == d2_color else '-'
 
     fig, ax = plt.subplots()
@@ -539,15 +534,14 @@ def calculatemaxpointsforremainingseason(year, round):
     return sprint_points + conventional_points
 
 def driverComparison(year, selected_race, selected_session, selected_driver1, selected_driver2):
-    fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
-    session = fastf1.get_session(year, selected_race, selected_session)
+    fpl.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
+    session = f1.get_session(year, selected_race, selected_session)
     session.load()
     fig1 = getSpeedTraceFor(session, selected_driver1, selected_driver2)
     fig2 = showqualifyingdeltas(session, drv_list=[selected_driver1,selected_driver2])
     styled = showSectorTimesComparison(session, selected_driver1, selected_driver2)
     st.pyplot(fig2)
     st.pyplot(fig1)
-    #html = styled.render()
     html = styled.to_html()
     components.html(html, height=300, scrolling=True)
 

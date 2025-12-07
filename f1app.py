@@ -67,7 +67,7 @@ def getlapsfor(session, driver):
     return laps
 
 def drawtrackfor(session):
-    fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
+    fpl.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
     lap = session.laps.pick_fastest()
     pos = lap.get_pos_data()
     circuit_info = session.get_circuit_info()
@@ -126,7 +126,7 @@ def plotdriverslaptimes(session, driver):
     fig, ax = plt.subplots(figsize=(8, 8))
 
     for drv in driver:
-        color = fastf1.plotting.get_driver_color(drv, session=session)
+        color = fpl.get_driver_color(drv, session=session)
         print(drv, color)
         driver_laps = session.laps.pick_drivers(drv).pick_quicklaps().reset_index()
         sns.scatterplot(data=driver_laps,
@@ -255,7 +255,7 @@ def showqualifyingdeltas(session, drv_list=None):
     fastest_laps['LapTimeDelta'] = fastest_laps['LapTime'] - pole_lap['LapTime']
     team_colors = list()
     for index, lap in fastest_laps.iterlaps():
-        color = fastf1.plotting.get_team_color(lap['Team'], session=session)
+        color = fpl.get_team_color(lap['Team'], session=session)
         team_colors.append(color)
     fig, ax = plt.subplots()
     ax.barh(fastest_laps.index, fastest_laps['LapTimeDelta'],
@@ -350,7 +350,7 @@ def driverlaptimes(session):
                    inner=None,
                    density_norm='area',
                    order=finishing_order,
-                   palette=fastf1.plotting.get_driver_color_mapping(session=session)
+                   palette=fpl.get_driver_color_mapping(session=session)
     )
     
     sns.swarmplot(data=driver_laps,
@@ -358,7 +358,7 @@ def driverlaptimes(session):
                   y='LapTime(s)',
                   hue='Compound',
                   order=finishing_order,
-                  palette=fastf1.plotting.get_compound_mapping(session=session),
+                  palette=fpl.get_compound_mapping(session=session),
                   hue_order=['SOFT', 'MEDIUM', 'HARD','INTERMEDIATE','WET'],
                   linewidth=0,
                   size=4

@@ -17,6 +17,28 @@ from plotly.io import show
 
 #fastf1.Cache.enable_cache('f1cache')
 
+def fastest_and_mins(drv: pd.DataFrame):
+    """Return fastest lap row (Series) and min sector times as dict."""
+    if drv.empty:
+        return None, {'Sector1Time': pd.NaT, 'Sector2Time': pd.NaT, 'Sector3Time': pd.NaT, 'LapTime': pd.NaT}
+    fastest_row = drv.sort_values('LapTime', ascending=True).iloc[0]
+    mins = drv[['Sector1Time', 'Sector2Time', 'Sector3Time', 'LapTime']].min()
+    return fastest_row, mins.to_dict()
+
+def format_td_safe(x, fmt_seconds='%s.%ms', fmt_lap='%m:%s.%ms'):
+    if pd.isna(x):
+        return ''
+    # x may already be a string (formatted) or timedelta or float seconds
+    if isinstance(x, str):
+        return x
+    try:
+        # assume timedelta-like
+        return strftimedelta(x, fmt_seconds if 'Sector' in cur_col else fmt_lap)
+    except Exception:
+        try:
+            return str(x)
+        except Exception:
+            return ''
 
 def rotate(xy, *, angle):
     rot_mat = np.array([[np.cos(angle), np.sin(angle)],
@@ -352,6 +374,99 @@ def driverlaptimes(session):
     plt.tight_layout()
     return fig
 
+# --- Data collection (vectorised and compact) -------------------------------
+# drivers and raw dataframes
+def showSectorTimesComparison(session, selected_driver1, selected_driver2):
+    laps = session.laps
+    drv1 = laps[(laps['Driver'] == selected_driver1) & (~laps.get('Deleted', False))]
+    drv2 = laps[(laps['Driver'] == selected_driver2) & (~laps.get('Deleted', False))]
+
+    drv1_row, drv1_mins = fastest_and_mins(drv1)
+    drv2_row, drv2_mins = fastest_and_mins(drv2)
+
+    drv1_team = drv1_row.get('Team', '') if drv1_row is not None else ''
+    drv2_team = drv2_row.get('Team', '') if drv2_row is not None else ''
+
+    # build ordered LapPart list and values (programmatic)
+    lap_parts = [
+        'Team',
+        'FL Sector 1', 'FL Sector 2', 'FL Sector 3', 'FL Lap',
+        'TL Sector 1', 'TL Sector 2', 'TL Sector 3',
+        'Theoretical Lap'
+    ]
+
+    # helper to extract value (fastest lap sectors vs mins)
+    def get_values_for_driver(driver_row, mins_dict, team):
+        vals = [
+            team,
+            driver_row.get('Sector1Time', pd.NaT) if driver_row is not None else pd.NaT,
+            driver_row.get('Sector2Time', pd.NaT) if driver_row is not None else pd.NaT,
+            driver_row.get('Sector3Time', pd.NaT) if driver_row is not None else pd.NaT,
+            driver_row.get('LapTime', pd.NaT) if driver_row is not None else pd.NaT,
+            mins_dict.get('Sector1Time', pd.NaT),
+            mins_dict.get('Sector2Time', pd.NaT),
+            mins_dict.get('Sector3Time', pd.NaT),
+            mins_dict.get('LapTime', pd.NaT),
+        ]
+        return vals
+
+    vals1 = get_values_for_driver(drv1_row, drv1_mins, drv1_team)
+    vals2 = get_values_for_driver(drv2_row, drv2_mins, drv2_team)
+
+    data = {'LapPart': lap_parts, selected_driver1: vals1, selected_driver2: vals2}
+    df = pd.DataFrame(data).set_index('LapPart')
+
+    # --- Compute diff only for time rows ----------------------------------------
+    time_rows = ['FL Sector 1','FL Sector 2','FL Sector 3','FL Lap', 'TL Sector 1','TL Sector 2','TL Sector 3', 'Theoretical Lap']
+
+    # Vectorised safe conversion to timedelta, errors -> NaT
+    a = pd.to_timedelta(df.loc[time_rows, selected_driver1], errors='coerce')
+    b = pd.to_timedelta(df.loc[time_rows, selected_driver2], errors='coerce')
+
+    # diff in seconds (or *1000 for ms)
+    df.loc[time_rows, f'{selected_driver1}/{selected_driver2}'] = (a - b).dt.total_seconds()
+    # keep non-time rows untouched (Team row remains string)
+    # optional: fill NaN with '' for display
+    df_display = df.copy().fillna('')
+    df_display.loc[time_rows, :] = df_display.loc[time_rows, :].where(df_display.loc[time_rows, :].notna(), pd.NA)
+
+    # --- Transpose and format display values -----------------------------------
+    df2 = df_display.transpose()  # drivers become rows
+    # format time rows to strings (safe)
+    format_map = {}
+    for col in ['FL Sector 1','FL Sector 2','FL Sector 3','TL Sector 1','TL Sector 2','TL Sector 3']:
+        # use sector format
+        df2[col] = df2[col].apply(lambda x: strftimedelta(x, '%s.%ms') if pd.notna(x) and not isinstance(x, (int,float)) else (f'{x:.3f}' if isinstance(x, (int,float)) else ''))
+
+    # Format FL Lap / Theoretical Lap to mm:ss.ms if timedelta
+    for col in ['FL Lap', 'Theoretical Lap']:
+        if col in df2.columns:
+            df2[col] = df2[col].apply(lambda x: strftimedelta(x, '%m:%s.%ms') if pd.notna(x) and not isinstance(x, (int,float)) else (f'{x:.3f}' if isinstance(x,(int,float)) else ''))
+
+    # --- Build driver colour map (use Team cell from df2) -----------------------
+    driver_colors = {}
+    for drv in df2.index:
+        team = df2.loc[drv, 'Team'] if 'Team' in df2.columns else None
+        if team:
+            try:
+                driver_colors[drv] = fpl.get_team_color(team, session=session)
+            except Exception:
+                driver_colors[drv] = '#CCCCCC'
+        else:
+            driver_colors[drv] = '#CCCCCC'
+
+    # --- (Optional) prepare styled Pandas Styler for notebook or HTML export ----
+    def style_row(row):
+        c = driver_colors.get(row.name, '#ffffff')
+        txt = '#000' if sum(map(lambda v: int(v*255), to_rgb(c))) / 3 > 128 else '#fff'  # readable text
+        return [f'background-color: {c}; color: {txt};' for _ in row]
+
+    styled = df2.style.apply(style_row, axis=1).set_table_styles(
+        [{'selector': 'th', 'props': [('background-color', '#222'), ('color', '#fff')]}]
+    ).set_properties(**{'border': '1px solid #999', 'padding': '6px'})
+    return styled
+    
+
 def showracedetails(year, race_name, session_name):
     session=getsessiondata(year, race_name , session_name, False)
     session.load()
@@ -429,9 +544,11 @@ def driverComparison(year, selected_race, selected_session, selected_driver1, se
     session.load()
     fig1 = getSpeedTraceFor(session, selected_driver1, selected_driver2)
     fig2 = showqualifyingdeltas(session, drv_list=[selected_driver1,selected_driver2])
+    styled = showSectorTimesComparison(session, selected_driver1, selected_driver2)
     st.pyplot(fig2)
     st.pyplot(fig1)
-
+    html = styled.render()
+    components.html(html, height=300, scrolling=True)
 
 def calculatewhocanwin(driver_standings, max_points):
     LEADER_POINTS = int(driver_standings.loc[0]['points'])

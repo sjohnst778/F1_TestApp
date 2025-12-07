@@ -12,6 +12,7 @@ from fastf1.ergast import Ergast
 from timple.timedelta import strftimedelta
 from typing import List
 from plotly.io import show
+from matplotlib.colors import to_rgb
 
 #fastf1.Cache.enable_cache('f1cache')
 
@@ -401,7 +402,7 @@ def showSectorTimesComparison(session, selected_driver1, selected_driver2):
             mins_dict.get('Sector1Time', pd.NaT),
             mins_dict.get('Sector2Time', pd.NaT),
             mins_dict.get('Sector3Time', pd.NaT),
-            mins_dict.get('LapTime', pd.NaT),
+            mins_dict.get('Sector1Time', pd.NaT) + mins_dict.get('Sector2Time', pd.NaT) + mins_dict.get('Sector3Time', pd.NaT)
         ]
         return vals
 
